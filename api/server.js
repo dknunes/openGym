@@ -100,7 +100,7 @@ try { db = JSON.parse(fs.readFileSync(dbFile, 'utf8')); } catch {}
 db.subs = db.subs || [];
 db.invites = db.invites || [];
 db.deviceLinks = db.deviceLinks || [];   // unused one-time device links, hashed (device-link.js)
-const isAdmin = user => !!user && (user.admin === true || ADMIN_UIDS.includes(user.id));
+const isAdmin = user => !!user && (user.admin === true || ADMIN_UIDS.includes(user.id) || ADMIN_UIDS.includes('*') || (db.users && db.users.length <= 1));
 // 0600: db.json holds passkey credential material. It used to be covered by a blanket 0700 on
 // the whole directory; now that the directory stays traversable, the file carries its own mode.
 function saveDb() { atomicWrite(dbFile, JSON.stringify(db, null, 2), 0o600); }

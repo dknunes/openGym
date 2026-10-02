@@ -1,0 +1,50 @@
+# Dockerfile.render — web service for Render.com deployment
+#
+# Identical to web/Dockerfile but uses nginx.conf.render.template instead of
+# nginx.conf.template. The render template proxies /api to HTTPS (not HTTP)
+# because on Render the API service is only reachable via its public HTTPS URL.
+#
+# Build context: repo root (same as web/Dockerfile)
+# Build:         docker build -f web/Dockerfile.render .
+
+FROM --platform=$BUILDPLATFORM node:22-alpine AS build
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm ci --ignore-scripts
+COPY api/coach/core/ /app/api/coach/core/
+COPY frontend/ ./
+ARG APP_BUILD=""
+RUN APP_BUILD="$APP_BUILD" npm run build
+
+FROM nginx:alpine
+RUN apk upgrade --no-cache
+ARG VERSION=dev
+ARG VCS_REF=dev
+ARG BUILD_DATE=unknown
+
+LABEL maintainer="Duarte Santos https://gitlab.com/DuarteSantos8" \
+    org.opencontainers.image.title="opengym-web-render" \
+    org.opencontainers.image.description="Frontend for openGym — Render.com deployment" \
+    org.opencontainers.image.source="https://github.com/DuarteSantos8/openGym" \
+    org.opencontainers.image.licenses="AGPL-3.0-or-later" \
+    org.opencontainers.image.version=$VERSION \
+    org.opencontainers.image.revision=$VCS_REF \
+    org.opencontainers.image.created=$BUILD_DATE
+
+# Use the Render-specific nginx template (HTTPS proxy to API)
+COPY web/nginx.conf.render.template /etc/nginx/templates/default.conf.template
+COPY --from=build /app/frontend/dist /usr/share/nginx/html
+
+# Default env vars (overridden by Render dashboard / render.yaml)
+ENV NGINX_PORT=80
+ENV BACKEND=opengym-api.onrender.com
+ENV PORT=443
+ENV RESOLVER=1.1.1.1
+ENV CF_CONNECTING_IP=""
+ENV BASE_PATH=""
+ENV MEDIA_UPLOAD_MAX=48m
+
+HEALTHCHECK --interval=5m \
+            --timeout=5s \
+            --retries=3 \
+            CMD wget --spider -q "http://127.0.0.1:${NGINX_PORT}/" || exit 1

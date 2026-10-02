@@ -1,0 +1,94 @@
+# openGym — nginx config for Render.com deployment
+#
+# Differences from the default template:
+#   - Proxies /api to HTTPS (not HTTP) because on Render the API service is
+#     only reachable via its public HTTPS URL (no internal Docker network).
+#   - Uses a public DNS resolver (1.1.1.1) instead of Docker's 127.0.0.11.
+#   - PORT is expected to be 443 (Render's external HTTPS port).
+#
+# Env vars consumed (set in Render dashboard or render.yaml):
+#   NGINX_PORT   - port nginx listens on (80)
+#   BACKEND      - API service hostname, e.g. opengym-api.onrender.com
+#   PORT         - API service port (443 for Render HTTPS)
+#   RESOLVER     - DNS resolver (1.1.1.1)
+#   CF_CONNECTING_IP - empty unless behind Cloudflare
+#   BASE_PATH    - subpath prefix (empty = serve at root)
+#   MEDIA_UPLOAD_MAX - nginx body size limit for media uploads (48m)
+
+server {
+    listen ${NGINX_PORT};
+    root /usr/share/nginx/html;
+    index index.html;
+
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "same-origin" always;
+    add_header Content-Security-Policy "frame-ancestors 'none'" always;
+
+    # API → backend service (HTTPS on Render)
+    location ^~ ${BASE_PATH}/api/ {
+        client_max_body_size 5m;
+        resolver ${RESOLVER} valid=10s ipv6=off;
+        set $api_upstream https://${BACKEND}:${PORT};
+        proxy_pass $api_upstream;
+        proxy_http_version 1.1;
+        proxy_ssl_server_name on;
+        proxy_set_header Host ${BACKEND};
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header CF-Connecting-IP "${CF_CONNECTING_IP}";
+    }
+
+    # Photos and videos of custom exercises
+    location ^~ ${BASE_PATH}/api/media/ {
+        client_max_body_size ${MEDIA_UPLOAD_MAX};
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        resolver ${RESOLVER} valid=10s ipv6=off;
+        set $api_upstream https://${BACKEND}:${PORT};
+        proxy_pass $api_upstream;
+        proxy_http_version 1.1;
+        proxy_ssl_server_name on;
+        proxy_set_header Host ${BACKEND};
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header CF-Connecting-IP "${CF_CONNECTING_IP}";
+    }
+
+    location ${BASE_PATH}/ {
+        rewrite ^${BASE_PATH}/(.*)$ /$1 break;
+        try_files $uri $uri/ @root;
+    }
+    location @root {
+        absolute_redirect off;
+        return 302 ${BASE_PATH}/$is_args$args;
+    }
+
+    location ~* \.(js|css|json|html)$ {
+        rewrite ^${BASE_PATH}/(.*)$ /$1 break;
+        add_header Cache-Control "no-cache, must-revalidate";
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "same-origin" always;
+        add_header Content-Security-Policy "frame-ancestors 'none'" always;
+    }
+
+    location ~* \.(png|jpg|jpeg|gif|ico|svg|woff|woff2|webp|avif)$ {
+        rewrite ^${BASE_PATH}/(.*)$ /$1 break;
+        expires 30d;
+        add_header Cache-Control "public, max-age=2592000, immutable";
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "same-origin" always;
+        add_header Content-Security-Policy "frame-ancestors 'none'" always;
+    }
+
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript image/svg+xml;
+    gzip_vary on;
+    gzip_min_length 1024;
+}

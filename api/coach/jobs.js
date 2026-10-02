@@ -362,6 +362,7 @@ async function execute(job) {
     });
     if (!attempt.ok) {
       // Cancelled by a forget, not failed by the provider: the log must not blame the job budget.
+      console.error('[COACH JOB FAILED]', job.kind, attempt.errorClass, attempt.detail || attempt.errors);
       const errorClass = ctl.signal.aborted ? 'forgotten' : attempt.errorClass;
       return finish(job, { outcome: 'failed', errorClass, detail: attempt.detail });
     }

@@ -144,15 +144,23 @@ export function httpAdapter(spec) {
         }
         const { data, text } = await readJson(res);
         if (!res.ok) {
+          console.error('[COACH HTTP ERROR]', res.status, text);
           const msg = spec.errorMessage(data) || trim(text, 200);
           if (RETRY_STATUSES.has(res.status) && transientRetries < RETRY_DELAYS_MS.length && !(signal && signal.aborted)) {
             await sleep(opts.retryDelayMs != null ? opts.retryDelayMs : RETRY_DELAYS_MS[transientRetries], signal);
             transientRetries++;
             continue;
           }
-          // Some OpenAI-compatible servers reject the JSON-mode flag outright. Once, without it.
-          if (res.status === 400 && spec.withoutJsonMode && !retriedWithoutJsonMode && /response_format|json_schema|json_object|json mode|structured/i.test(msg)) {
+          // Some OpenAI-compatible servers (like NVIDIA) reject json_schema or schema format outright.
+          if (res.status === 400 && spec.withoutJsonMode && !retriedWithoutJsonMode && /response_format|json_schema|json_object|json mode|structured|schema/i.test(msg)) {
             body = spec.withoutJsonMode(body);
+            retriedWithoutJsonMode = true;
+            continue;
+          }
+          // Handle max_tokens ceiling errors
+          if (res.status === 400 && !retriedWithoutJsonMode && /max_tokens/i.test(msg) && (body.max_tokens > 2048 || body.max_completion_tokens > 2048)) {
+            if (body.max_tokens) body.max_tokens = 2048;
+            if (body.max_completion_tokens) body.max_completion_tokens = 2048;
             retriedWithoutJsonMode = true;
             continue;
           }

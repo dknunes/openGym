@@ -43,7 +43,13 @@ ENV CF_CONNECTING_IP=""
 ENV BASE_PATH=""
 ENV MEDIA_UPLOAD_MAX=48m
 
+COPY web/entrypoint.render.sh /entrypoint.render.sh
+RUN chmod +x /entrypoint.render.sh
+
 HEALTHCHECK --interval=5m \
             --timeout=5s \
             --retries=3 \
             CMD wget --spider -q "http://127.0.0.1:${PORT}/" || exit 1
+
+ENTRYPOINT ["/entrypoint.render.sh"]
+CMD ["nginx", "-g", "daemon off;"]

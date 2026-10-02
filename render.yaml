@@ -71,18 +71,14 @@ services:
     plan: free
     healthCheckPath: /
     envVars:
-      - key: NGINX_PORT
+      - key: PORT
         value: "80"
       # On Render, services communicate via their public HTTPS URL.
-      # After deploy, set BACKEND to the host of opengym-api (e.g. opengym-api.onrender.com)
-      # and PORT to 443 (Render serves HTTPS).
       - key: BACKEND
         fromService:
           name: opengym-api
           type: web
           property: host
-      - key: PORT
-        value: "443"
       # Use a public DNS resolver (Render doesn't expose Docker's internal 127.0.0.11)
       - key: RESOLVER
         value: "1.1.1.1"

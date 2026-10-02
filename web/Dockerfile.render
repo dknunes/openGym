@@ -36,9 +36,8 @@ COPY web/nginx.conf.render.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/frontend/dist /usr/share/nginx/html
 
 # Default env vars (overridden by Render dashboard / render.yaml)
-ENV NGINX_PORT=80
+ENV PORT=80
 ENV BACKEND=opengym-api.onrender.com
-ENV PORT=443
 ENV RESOLVER=1.1.1.1
 ENV CF_CONNECTING_IP=""
 ENV BASE_PATH=""
@@ -47,4 +46,4 @@ ENV MEDIA_UPLOAD_MAX=48m
 HEALTHCHECK --interval=5m \
             --timeout=5s \
             --retries=3 \
-            CMD wget --spider -q "http://127.0.0.1:${NGINX_PORT}/" || exit 1
+            CMD wget --spider -q "http://127.0.0.1:${PORT}/" || exit 1

@@ -57,12 +57,7 @@ services:
       # ── Language ─────────────────────────────────────────────────────────────
       - key: DEFAULT_LANG
         value: "pt-BR"
-      # ── Disk (requires paid plan on Render) ───────────────────────────────────
-      # Without this, data is ephemeral (lost on every deploy).
-    disk:
-      name: opengym-data
-      mountPath: /data
-      sizeGB: 1
+
 
   ##############################################################################
   # WEB — nginx + React frontend (proxies /api → opengym-api)

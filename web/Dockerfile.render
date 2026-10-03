@@ -35,6 +35,17 @@ LABEL maintainer="Duarte Santos https://gitlab.com/DuarteSantos8" \
 COPY web/nginx.conf.render.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/frontend/dist /usr/share/nginx/html
 
+# Download exercise images and GIFs from hasaneyldrm/exercises-dataset (MIT for metadata/text;
+# images and GIFs © Gym visual — https://gymvisual.com/ — used under that dataset's terms.
+# openGym does not redistribute or relicense them. See NOTICE.md.)
+RUN apk add --no-cache git \
+ && git clone --depth 1 https://github.com/hasaneyldrm/exercises-dataset /tmp/exercises-dataset \
+ && mkdir -p /usr/share/nginx/html/img /usr/share/nginx/html/gif \
+ && cp /tmp/exercises-dataset/images/*.jpg /usr/share/nginx/html/img/ \
+ && cp /tmp/exercises-dataset/videos/*.gif /usr/share/nginx/html/gif/ \
+ && rm -rf /tmp/exercises-dataset \
+ && apk del git
+
 # Default env vars (overridden by Render dashboard / render.yaml)
 ENV PORT=80
 ENV BACKEND=opengym-api.onrender.com
